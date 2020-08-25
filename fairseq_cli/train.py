@@ -27,7 +27,10 @@ from fairseq.data import iterators
 from fairseq.logging import meters, metrics, progress_bar
 from fairseq.model_parallel.megatron_trainer import MegatronTrainer
 from fairseq.trainer import Trainer
+import numpy as np
+import pandas as pd
 
+iter_meter = meters.TrainIterMeter()
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -130,6 +133,12 @@ def main(args):
         )
     train_meter.stop()
     logger.info("done training in {:.1f} seconds".format(train_meter.sum))
+    if args.result_dir:
+        res = {'Model': ['Transformer'], 'Dtype': ['FP16'] if args.fp16 else ['FP32'],
+                'Iteration': [len(iter_meter.iter_elapsed)], 'TotalDurationNs': [iter_meter.iter_elapsed_total * 1e9],
+                'AvgIterDurationNs': [iter_meter.iter_elapsed_avg * 1e9]}
+        df = pd.DataFrame(res)
+        df.to_csv(f'{args.result_dir}/model.csv', index=False)
 
 
 def should_stop_early(args, valid_loss):
@@ -196,7 +205,11 @@ def train(args, trainer, task, epoch_itr):
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
             "train_step-%d" % i
         ):
+            iter_meter.iter_start()
             log_output = trainer.train_step(samples)
+            iter_meter.iter_stop()
+            if i < args.warmup_update:
+                iter_meter.reset()
 
         if log_output is not None:  # not OOM, overflow, ...
             # log mid-epoch stats

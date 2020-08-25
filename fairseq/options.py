@@ -270,6 +270,8 @@ def get_parser(desc, default_task="translation"):
     parser.add_argument('--quantization-config-path', default=None,
                         help='path to quantization config file')
     parser.add_argument('--profile', action='store_true', help='enable autograd profiler emit_nvtx')
+    parser.add_argument('--warmup-update', default=0, type=int, help='cold iteration')
+    parser.add_argument('--result-dir', default="", type=str, help='for res files')
 
     from fairseq.registry import REGISTRIES
     for registry_name, REGISTRY in REGISTRIES.items():
